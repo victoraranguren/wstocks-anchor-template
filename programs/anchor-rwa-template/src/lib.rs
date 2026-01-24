@@ -21,6 +21,7 @@ pub mod anchor_rwa_template {
 
     pub fn initialize_asset(
         ctx: Context<InitializeAsset>,
+        id: u64,
         asset_symbol: String,
         asset_isin: String,
         legal_doc_uri: String,
@@ -30,6 +31,9 @@ pub mod anchor_rwa_template {
         //1. Creaye registry
         let asset_registry = &mut ctx.accounts.asset_registry;
         let timestamp = Clock::get()?.unix_timestamp;
+
+        asset_registry.id = id;
+
         asset_registry.authority = ctx.accounts.owner.key();
         asset_registry.mint = ctx.accounts.mint.key();
 
@@ -42,8 +46,9 @@ pub mod anchor_rwa_template {
         asset_registry.asset_type = asset_type;
         asset_registry.bump = ctx.bumps.asset_registry;
 
+        let id_bytes = id.to_le_bytes();
         //2. Create token
-        let seeds = &["mint".as_bytes(), &[ctx.bumps.mint]];
+        let seeds = &["mint".as_bytes(), id_bytes.as_ref(), &[ctx.bumps.mint]];
         let signer = [&seeds[..]];
 
         let token_data: DataV2 = DataV2 {
@@ -60,10 +65,10 @@ pub mod anchor_rwa_template {
             ctx.accounts.token_metadata_program.to_account_info(),
             CreateMetadataAccountsV3 {
                 payer: ctx.accounts.owner.to_account_info(),
-                update_authority: ctx.accounts.mint.to_account_info(),
+                update_authority: ctx.accounts.owner.to_account_info(),
                 mint: ctx.accounts.mint.to_account_info(),
                 metadata: ctx.accounts.metadata.to_account_info(),
-                mint_authority: ctx.accounts.mint.to_account_info(),
+                mint_authority: ctx.accounts.owner.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
                 rent: ctx.accounts.rent.to_account_info(),
             },
@@ -81,14 +86,17 @@ pub mod anchor_rwa_template {
 pub struct Initialize {}
 
 #[derive(Accounts)]
+#[instruction(
+    id: u64,
+)]
 pub struct InitializeAsset<'info> {
-    #[account(init, payer = owner, space = AssetRegistry::INIT_SPACE, seeds = [b"asset_registry", owner.key().as_ref()], bump)]
+    #[account(init, payer = owner, space = AssetRegistry::INIT_SPACE, seeds = [b"asset_registry", owner.key().as_ref(), id.to_le_bytes().as_ref()], bump)]
     pub asset_registry: Account<'info, AssetRegistry>,
     #[account(init,
         payer = owner,
-        seeds = [b"mint"],
+        seeds = [b"mint", id.to_le_bytes().as_ref()],
         bump,
-        mint::decimals = 8, mint::authority = mint, mint::freeze_authority = mint
+        mint::decimals = 8, mint::authority = owner, mint::freeze_authority = owner
     )]
     pub mint: Account<'info, Mint>,
     /// CHECK: New Metaplex Account being created
@@ -108,6 +116,8 @@ pub struct InitializeAsset<'info> {
 #[account]
 #[derive(InitSpace)]
 pub struct AssetRegistry {
+    pub id: u64,
+
     pub authority: Pubkey,
     pub mint: Pubkey,
 

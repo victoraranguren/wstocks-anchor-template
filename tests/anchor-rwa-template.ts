@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { BN } from "bn.js";
 import { AnchorRwaTemplate } from "../target/types/anchor_rwa_template";
 
 describe("anchor-rwa-template", () => {
@@ -16,6 +17,8 @@ describe("anchor-rwa-template", () => {
   });
 
   it("Is AssetRegistry initialized!", async () => {
+    const uniqueId = new BN(Date.now());
+    const uniqueIdBuffer = uniqueId.toArrayLike(Buffer, "le", 8);
     const assetRegistry = {
       assetName: "Apple Xstocks",
       assetSymbol: "WAAPL",
@@ -23,14 +26,21 @@ describe("anchor-rwa-template", () => {
       legalDocUri: "https://www.youtube.com/watch?v=MOl4s-VIuLQ",
       assetType: { equity: {} },
     };
-    const [assetRegistryPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("asset_registry"), wallet.publicKey.toBuffer()],
-      program.programId
-    );
+
     const [mint] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("mint")],
+      [Buffer.from("mint"), uniqueIdBuffer],
       program.programId
     );
+
+    const [assetRegistryPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("asset_registry"),
+        wallet.publicKey.toBuffer(),
+        uniqueIdBuffer,
+      ],
+      program.programId
+    );
+
     const METADATA_SEED = "metadata";
     const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey(
       "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
@@ -58,6 +68,7 @@ describe("anchor-rwa-template", () => {
     // Add your test here.
     const tx = await program.methods
       .initializeAsset(
+        uniqueId,
         assetRegistry.assetSymbol,
         assetRegistry.assetIsin,
         assetRegistry.legalDocUri,
@@ -73,7 +84,7 @@ describe("anchor-rwa-template", () => {
       .rpc();
     console.log("Your transaction signature", tx);
 
-    let assetRegistryAccount = await program.account.assetRegistry.fetch(
+    const assetRegistryAccount = await program.account.assetRegistry.fetch(
       assetRegistryPda
     );
     console.log("assetRegistry: ", assetRegistryAccount);
