@@ -1,5 +1,12 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    metadata::{
+        create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
+        Metadata as Metaplex,
+    },
+    token::{mint_to, Mint, MintTo, Token, TokenAccount},
+};
 
 declare_id!("jEXgKE9NWJihHqLVAoXZ4e2TSZ7KkV7kub8j4ojcmZC");
 
@@ -18,7 +25,9 @@ pub mod anchor_rwa_template {
         asset_isin: String,
         legal_doc_uri: String,
         asset_type: AssetType,
+        metadata: InitTokenParams,
     ) -> Result<()> {
+        //1. Creaye registry
         let asset_registry = &mut ctx.accounts.asset_registry;
         let timestamp = Clock::get()?.unix_timestamp;
         asset_registry.authority = ctx.accounts.owner.key();
@@ -33,6 +42,37 @@ pub mod anchor_rwa_template {
         asset_registry.asset_type = asset_type;
         asset_registry.bump = ctx.bumps.asset_registry;
 
+        //2. Create token
+        let seeds = &["mint".as_bytes(), &[ctx.bumps.mint]];
+        let signer = [&seeds[..]];
+
+        let token_data: DataV2 = DataV2 {
+            name: metadata.name,
+            symbol: metadata.symbol,
+            uri: metadata.uri,
+            seller_fee_basis_points: 0,
+            creators: None,
+            collection: None,
+            uses: None,
+        };
+
+        let metadata_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_metadata_program.to_account_info(),
+            CreateMetadataAccountsV3 {
+                payer: ctx.accounts.owner.to_account_info(),
+                update_authority: ctx.accounts.mint.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                metadata: ctx.accounts.metadata.to_account_info(),
+                mint_authority: ctx.accounts.mint.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                rent: ctx.accounts.rent.to_account_info(),
+            },
+            &signer,
+        );
+
+        create_metadata_accounts_v3(metadata_ctx, token_data, false, true, None)?;
+
+        msg!("Token mint created successfully.");
         Ok(())
     }
 }
@@ -44,14 +84,23 @@ pub struct Initialize {}
 pub struct InitializeAsset<'info> {
     #[account(init, payer = owner, space = AssetRegistry::INIT_SPACE, seeds = [b"asset_registry", owner.key().as_ref()], bump)]
     pub asset_registry: Account<'info, AssetRegistry>,
-    #[account(init, payer = owner, mint::decimals = 8, mint::authority = owner, mint::freeze_authority = owner)]
+    #[account(init,
+        payer = owner,
+        seeds = [b"mint"],
+        bump,
+        mint::decimals = 8, mint::authority = mint, mint::freeze_authority = mint
+    )]
     pub mint: Account<'info, Mint>,
+    /// CHECK: New Metaplex Account being created
+    #[account(mut)]
+    pub metadata: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub owner: Signer<'info>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub token_metadata_program: Program<'info, Metaplex>,
 
     pub rent: Sysvar<'info, Rent>,
 }
@@ -81,4 +130,12 @@ pub enum AssetType {
     Debt,
     RealEstate,
     Commodity,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
+pub struct InitTokenParams {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    pub decimals: u8,
 }

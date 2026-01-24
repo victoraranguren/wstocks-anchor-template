@@ -1,6 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { min } from "bn.js";
 import { AnchorRwaTemplate } from "../target/types/anchor_rwa_template";
 
 describe("anchor-rwa-template", () => {
@@ -18,21 +17,43 @@ describe("anchor-rwa-template", () => {
 
   it("Is AssetRegistry initialized!", async () => {
     const assetRegistry = {
+      assetName: "Apple Xstocks",
       assetSymbol: "WAAPL",
       assetIsin: "VE-WAAPL-001",
       legalDocUri: "https://www.youtube.com/watch?v=MOl4s-VIuLQ",
       assetType: { equity: {} },
     };
-    const mint = anchor.web3.Keypair.generate();
-    const [assetRegistryPda, bump] =
-      anchor.web3.PublicKey.findProgramAddressSync(
-        [Buffer.from("asset_registry"), wallet.publicKey.toBuffer()],
-        program.programId
-      );
+    const [assetRegistryPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("asset_registry"), wallet.publicKey.toBuffer()],
+      program.programId
+    );
+    const [mint] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("mint")],
+      program.programId
+    );
+    const METADATA_SEED = "metadata";
+    const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey(
+      "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+    );
+    const metadata = {
+      name: assetRegistry.assetName,
+      symbol: assetRegistry.assetSymbol,
+      uri: "",
+      decimals: 8,
+    };
+    const [metadataAddress] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(METADATA_SEED),
+        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+        mint.toBuffer(),
+      ],
+      TOKEN_METADATA_PROGRAM_ID
+    );
 
     console.log("assetRegistry: ", assetRegistry);
     console.log("assetRegistryPda: ", assetRegistryPda);
-    console.log("mint: ", mint.publicKey);
+    console.log("mint: ", mint);
+    console.log("metadata: ", metadataAddress);
     console.log("wallet: ", wallet.publicKey);
     // Add your test here.
     const tx = await program.methods
@@ -40,14 +61,15 @@ describe("anchor-rwa-template", () => {
         assetRegistry.assetSymbol,
         assetRegistry.assetIsin,
         assetRegistry.legalDocUri,
-        assetRegistry.assetType
+        assetRegistry.assetType,
+        metadata
       )
       .accounts({
         owner: wallet.publicKey,
+        mint: mint,
+        metadata: metadataAddress,
         assetRegistry: assetRegistryPda,
-        mint: mint.publicKey,
       })
-      .signers([mint])
       .rpc();
     console.log("Your transaction signature", tx);
 
