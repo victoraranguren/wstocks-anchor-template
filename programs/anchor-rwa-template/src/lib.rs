@@ -78,6 +78,21 @@ pub mod anchor_rwa_template {
         create_metadata_accounts_v3(metadata_ctx, token_data, false, true, None)?;
 
         msg!("Token mint created successfully.");
+
+        //3. Mint tokens to the owner's wallet
+        let mint_tokens_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: ctx.accounts.mint.to_account_info(),
+                to: ctx.accounts.owner_asset_token_account.to_account_info(),
+                authority: ctx.accounts.owner.to_account_info(),
+            },
+            &signer,
+        );
+
+        mint_to(mint_tokens_ctx, 100_000_000_000_000)?;
+
+        msg!("Tokens minted successfully.");
         Ok(())
     }
 }
@@ -106,9 +121,17 @@ pub struct InitializeAsset<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
+    #[account(init_if_needed, 
+        payer = owner,
+        associated_token::mint = mint,
+        associated_token::authority = owner
+    )]
+    pub owner_asset_token_account: Account<'info, TokenAccount>,
+
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub token_metadata_program: Program<'info, Metaplex>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 
     pub rent: Sysvar<'info, Rent>,
 }

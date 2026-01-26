@@ -2,6 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { BN } from "bn.js";
 import { AnchorRwaTemplate } from "../target/types/anchor_rwa_template";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 describe("anchor-rwa-template", () => {
   // Configure the client to use the local cluster.
@@ -20,9 +21,9 @@ describe("anchor-rwa-template", () => {
     const uniqueId = new BN(Date.now());
     const uniqueIdBuffer = uniqueId.toArrayLike(Buffer, "le", 8);
     const assetRegistry = {
-      assetName: "Apple Xstocks",
-      assetSymbol: "WAAPL",
-      assetIsin: "VE-WAAPL-001",
+      assetName: "Tesla Xstocks",
+      assetSymbol: "WTSLA",
+      assetIsin: "VE-WTSLA-002",
       legalDocUri: "https://www.youtube.com/watch?v=MOl4s-VIuLQ",
       assetType: { equity: {} },
     };
@@ -60,11 +61,14 @@ describe("anchor-rwa-template", () => {
       TOKEN_METADATA_PROGRAM_ID
     );
 
+    const ata = await getAssociatedTokenAddress(mint, wallet.publicKey);
+
     console.log("assetRegistry: ", assetRegistry);
     console.log("assetRegistryPda: ", assetRegistryPda);
     console.log("mint: ", mint);
     console.log("metadata: ", metadataAddress);
     console.log("wallet: ", wallet.publicKey);
+    console.log("ata: ", ata);
     // Add your test here.
     const tx = await program.methods
       .initializeAsset(
@@ -80,6 +84,7 @@ describe("anchor-rwa-template", () => {
         mint: mint,
         metadata: metadataAddress,
         assetRegistry: assetRegistryPda,
+        ownerAssetTokenAccount: ata,
       })
       .rpc();
     console.log("Your transaction signature", tx);
@@ -88,5 +93,8 @@ describe("anchor-rwa-template", () => {
       assetRegistryPda
     );
     console.log("assetRegistry: ", assetRegistryAccount);
+
+    const assetRegistryAccountAll = await program.account.assetRegistry.all();
+    console.log("assetRegistry All: ", assetRegistryAccountAll);
   });
 });
