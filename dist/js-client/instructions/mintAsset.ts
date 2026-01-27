@@ -7,8 +7,6 @@
  */
 
 import {
-  addDecoderSizePrefix,
-  addEncoderSizePrefix,
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
@@ -18,21 +16,15 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
-  getU32Decoder,
-  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
-  getUtf8Decoder,
-  getUtf8Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
@@ -45,39 +37,32 @@ import {
 import { ANCHOR_RWA_TEMPLATE_PROGRAM_ADDRESS } from "../programs";
 import {
   expectAddress,
-  expectSome,
   getAccountMetaFactory,
   type ResolvedAccount,
 } from "../shared";
-import {
-  getAssetTypeDecoder,
-  getAssetTypeEncoder,
-  type AssetType,
-  type AssetTypeArgs,
-} from "../types";
 
-export const INITIALIZE_ASSET_DISCRIMINATOR = new Uint8Array([
-  214, 153, 49, 248, 95, 248, 208, 179,
+export const MINT_ASSET_DISCRIMINATOR = new Uint8Array([
+  84, 175, 211, 156, 56, 250, 104, 118,
 ]);
 
-export function getInitializeAssetDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(
-    INITIALIZE_ASSET_DISCRIMINATOR,
-  );
+export function getMintAssetDiscriminatorBytes() {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(MINT_ASSET_DISCRIMINATOR);
 }
 
-export type InitializeAssetInstruction<
+export type MintAssetInstruction<
   TProgram extends string = typeof ANCHOR_RWA_TEMPLATE_PROGRAM_ADDRESS,
   TAccountAssetRegistry extends string | AccountMeta<string> = string,
   TAccountMint extends string | AccountMeta<string> = string,
-  TAccountMetadata extends string | AccountMeta<string> = string,
   TAccountOwner extends string | AccountMeta<string> = string,
+  TAccountDestiny extends string | AccountMeta<string> = string,
+  TAccountDestinyAssetTokenAccount extends string | AccountMeta<string> =
+    string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TAccountTokenProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-  TAccountTokenMetadataProgram extends string | AccountMeta<string> =
-    "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
   TAccountRent extends string | AccountMeta<string> =
     "SysvarRent111111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -91,22 +76,25 @@ export type InitializeAssetInstruction<
       TAccountMint extends string
         ? WritableAccount<TAccountMint>
         : TAccountMint,
-      TAccountMetadata extends string
-        ? WritableAccount<TAccountMetadata>
-        : TAccountMetadata,
       TAccountOwner extends string
         ? WritableSignerAccount<TAccountOwner> &
             AccountSignerMeta<TAccountOwner>
         : TAccountOwner,
+      TAccountDestiny extends string
+        ? ReadonlyAccount<TAccountDestiny>
+        : TAccountDestiny,
+      TAccountDestinyAssetTokenAccount extends string
+        ? WritableAccount<TAccountDestinyAssetTokenAccount>
+        : TAccountDestinyAssetTokenAccount,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
         : TAccountTokenProgram,
-      TAccountTokenMetadataProgram extends string
-        ? ReadonlyAccount<TAccountTokenMetadataProgram>
-        : TAccountTokenMetadataProgram,
+      TAccountAssociatedTokenProgram extends string
+        ? ReadonlyAccount<TAccountAssociatedTokenProgram>
+        : TAccountAssociatedTokenProgram,
       TAccountRent extends string
         ? ReadonlyAccount<TAccountRent>
         : TAccountRent,
@@ -114,135 +102,99 @@ export type InitializeAssetInstruction<
     ]
   >;
 
-export type InitializeAssetInstructionData = {
+export type MintAssetInstructionData = {
   discriminator: ReadonlyUint8Array;
-  id: bigint;
-  assetSymbol: string;
-  assetIsin: string;
-  legalDocUri: string;
-  assetType: AssetType;
-  name: string;
-  symbol: string;
-  uri: string;
-  decimals: number;
+  amountTokens: bigint;
 };
 
-export type InitializeAssetInstructionDataArgs = {
-  id: number | bigint;
-  assetSymbol: string;
-  assetIsin: string;
-  legalDocUri: string;
-  assetType: AssetTypeArgs;
-  name: string;
-  symbol: string;
-  uri: string;
-  decimals: number;
-};
+export type MintAssetInstructionDataArgs = { amountTokens: number | bigint };
 
-export function getInitializeAssetInstructionDataEncoder(): Encoder<InitializeAssetInstructionDataArgs> {
+export function getMintAssetInstructionDataEncoder(): FixedSizeEncoder<MintAssetInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      ["id", getU64Encoder()],
-      ["assetSymbol", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
-      ["assetIsin", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
-      ["legalDocUri", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
-      ["assetType", getAssetTypeEncoder()],
-      ["name", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
-      ["symbol", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
-      ["uri", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
-      ["decimals", getU8Encoder()],
+      ["amountTokens", getU64Encoder()],
     ]),
-    (value) => ({ ...value, discriminator: INITIALIZE_ASSET_DISCRIMINATOR }),
+    (value) => ({ ...value, discriminator: MINT_ASSET_DISCRIMINATOR }),
   );
 }
 
-export function getInitializeAssetInstructionDataDecoder(): Decoder<InitializeAssetInstructionData> {
+export function getMintAssetInstructionDataDecoder(): FixedSizeDecoder<MintAssetInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    ["id", getU64Decoder()],
-    ["assetSymbol", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ["assetIsin", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ["legalDocUri", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ["assetType", getAssetTypeDecoder()],
-    ["name", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ["symbol", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ["uri", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
-    ["decimals", getU8Decoder()],
+    ["amountTokens", getU64Decoder()],
   ]);
 }
 
-export function getInitializeAssetInstructionDataCodec(): Codec<
-  InitializeAssetInstructionDataArgs,
-  InitializeAssetInstructionData
+export function getMintAssetInstructionDataCodec(): FixedSizeCodec<
+  MintAssetInstructionDataArgs,
+  MintAssetInstructionData
 > {
   return combineCodec(
-    getInitializeAssetInstructionDataEncoder(),
-    getInitializeAssetInstructionDataDecoder(),
+    getMintAssetInstructionDataEncoder(),
+    getMintAssetInstructionDataDecoder(),
   );
 }
 
-export type InitializeAssetAsyncInput<
+export type MintAssetAsyncInput<
   TAccountAssetRegistry extends string = string,
   TAccountMint extends string = string,
-  TAccountMetadata extends string = string,
   TAccountOwner extends string = string,
+  TAccountDestiny extends string = string,
+  TAccountDestinyAssetTokenAccount extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountTokenProgram extends string = string,
-  TAccountTokenMetadataProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
   TAccountRent extends string = string,
 > = {
-  assetRegistry?: Address<TAccountAssetRegistry>;
-  mint?: Address<TAccountMint>;
-  metadata: Address<TAccountMetadata>;
+  assetRegistry: Address<TAccountAssetRegistry>;
+  mint: Address<TAccountMint>;
   owner: TransactionSigner<TAccountOwner>;
+  /** CHECK */
+  destiny: Address<TAccountDestiny>;
+  destinyAssetTokenAccount?: Address<TAccountDestinyAssetTokenAccount>;
   systemProgram?: Address<TAccountSystemProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
-  tokenMetadataProgram?: Address<TAccountTokenMetadataProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   rent?: Address<TAccountRent>;
-  id: InitializeAssetInstructionDataArgs["id"];
-  assetSymbol: InitializeAssetInstructionDataArgs["assetSymbol"];
-  assetIsin: InitializeAssetInstructionDataArgs["assetIsin"];
-  legalDocUri: InitializeAssetInstructionDataArgs["legalDocUri"];
-  assetType: InitializeAssetInstructionDataArgs["assetType"];
-  name: InitializeAssetInstructionDataArgs["name"];
-  symbol: InitializeAssetInstructionDataArgs["symbol"];
-  uri: InitializeAssetInstructionDataArgs["uri"];
-  decimals: InitializeAssetInstructionDataArgs["decimals"];
+  amountTokens: MintAssetInstructionDataArgs["amountTokens"];
 };
 
-export async function getInitializeAssetInstructionAsync<
+export async function getMintAssetInstructionAsync<
   TAccountAssetRegistry extends string,
   TAccountMint extends string,
-  TAccountMetadata extends string,
   TAccountOwner extends string,
+  TAccountDestiny extends string,
+  TAccountDestinyAssetTokenAccount extends string,
   TAccountSystemProgram extends string,
   TAccountTokenProgram extends string,
-  TAccountTokenMetadataProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
   TAccountRent extends string,
   TProgramAddress extends Address = typeof ANCHOR_RWA_TEMPLATE_PROGRAM_ADDRESS,
 >(
-  input: InitializeAssetAsyncInput<
+  input: MintAssetAsyncInput<
     TAccountAssetRegistry,
     TAccountMint,
-    TAccountMetadata,
     TAccountOwner,
+    TAccountDestiny,
+    TAccountDestinyAssetTokenAccount,
     TAccountSystemProgram,
     TAccountTokenProgram,
-    TAccountTokenMetadataProgram,
+    TAccountAssociatedTokenProgram,
     TAccountRent
   >,
   config?: { programAddress?: TProgramAddress },
 ): Promise<
-  InitializeAssetInstruction<
+  MintAssetInstruction<
     TProgramAddress,
     TAccountAssetRegistry,
     TAccountMint,
-    TAccountMetadata,
     TAccountOwner,
+    TAccountDestiny,
+    TAccountDestinyAssetTokenAccount,
     TAccountSystemProgram,
     TAccountTokenProgram,
-    TAccountTokenMetadataProgram,
+    TAccountAssociatedTokenProgram,
     TAccountRent
   >
 > {
@@ -254,12 +206,16 @@ export async function getInitializeAssetInstructionAsync<
   const originalAccounts = {
     assetRegistry: { value: input.assetRegistry ?? null, isWritable: true },
     mint: { value: input.mint ?? null, isWritable: true },
-    metadata: { value: input.metadata ?? null, isWritable: true },
     owner: { value: input.owner ?? null, isWritable: true },
+    destiny: { value: input.destiny ?? null, isWritable: false },
+    destinyAssetTokenAccount: {
+      value: input.destinyAssetTokenAccount ?? null,
+      isWritable: true,
+    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    tokenMetadataProgram: {
-      value: input.tokenMetadataProgram ?? null,
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
       isWritable: false,
     },
     rent: { value: input.rent ?? null, isWritable: false },
@@ -273,26 +229,20 @@ export async function getInitializeAssetInstructionAsync<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.assetRegistry.value) {
-    accounts.assetRegistry.value = await getProgramDerivedAddress({
-      programAddress,
+  if (!accounts.destinyAssetTokenAccount.value) {
+    accounts.destinyAssetTokenAccount.value = await getProgramDerivedAddress({
+      programAddress:
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
       seeds: [
+        getAddressEncoder().encode(expectAddress(accounts.destiny.value)),
         getBytesEncoder().encode(
           new Uint8Array([
-            97, 115, 115, 101, 116, 95, 114, 101, 103, 105, 115, 116, 114, 121,
+            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
+            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
+            126, 255, 0, 169,
           ]),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.owner.value)),
-        getU64Encoder().encode(expectSome(args.id)),
-      ],
-    });
-  }
-  if (!accounts.mint.value) {
-    accounts.mint.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([109, 105, 110, 116])),
-        getU64Encoder().encode(expectSome(args.id)),
+        getAddressEncoder().encode(expectAddress(accounts.mint.value)),
       ],
     });
   }
@@ -304,9 +254,9 @@ export async function getInitializeAssetInstructionAsync<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
-  if (!accounts.tokenMetadataProgram.value) {
-    accounts.tokenMetadataProgram.value =
-      "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" as Address<"metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s">;
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.rent.value) {
     accounts.rent.value =
@@ -318,90 +268,90 @@ export async function getInitializeAssetInstructionAsync<
     accounts: [
       getAccountMeta(accounts.assetRegistry),
       getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.metadata),
       getAccountMeta(accounts.owner),
+      getAccountMeta(accounts.destiny),
+      getAccountMeta(accounts.destinyAssetTokenAccount),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.tokenMetadataProgram),
+      getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.rent),
     ],
-    data: getInitializeAssetInstructionDataEncoder().encode(
-      args as InitializeAssetInstructionDataArgs,
+    data: getMintAssetInstructionDataEncoder().encode(
+      args as MintAssetInstructionDataArgs,
     ),
     programAddress,
-  } as InitializeAssetInstruction<
+  } as MintAssetInstruction<
     TProgramAddress,
     TAccountAssetRegistry,
     TAccountMint,
-    TAccountMetadata,
     TAccountOwner,
+    TAccountDestiny,
+    TAccountDestinyAssetTokenAccount,
     TAccountSystemProgram,
     TAccountTokenProgram,
-    TAccountTokenMetadataProgram,
+    TAccountAssociatedTokenProgram,
     TAccountRent
   >);
 }
 
-export type InitializeAssetInput<
+export type MintAssetInput<
   TAccountAssetRegistry extends string = string,
   TAccountMint extends string = string,
-  TAccountMetadata extends string = string,
   TAccountOwner extends string = string,
+  TAccountDestiny extends string = string,
+  TAccountDestinyAssetTokenAccount extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountTokenProgram extends string = string,
-  TAccountTokenMetadataProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
   TAccountRent extends string = string,
 > = {
   assetRegistry: Address<TAccountAssetRegistry>;
   mint: Address<TAccountMint>;
-  metadata: Address<TAccountMetadata>;
   owner: TransactionSigner<TAccountOwner>;
+  /** CHECK */
+  destiny: Address<TAccountDestiny>;
+  destinyAssetTokenAccount: Address<TAccountDestinyAssetTokenAccount>;
   systemProgram?: Address<TAccountSystemProgram>;
   tokenProgram?: Address<TAccountTokenProgram>;
-  tokenMetadataProgram?: Address<TAccountTokenMetadataProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
   rent?: Address<TAccountRent>;
-  id: InitializeAssetInstructionDataArgs["id"];
-  assetSymbol: InitializeAssetInstructionDataArgs["assetSymbol"];
-  assetIsin: InitializeAssetInstructionDataArgs["assetIsin"];
-  legalDocUri: InitializeAssetInstructionDataArgs["legalDocUri"];
-  assetType: InitializeAssetInstructionDataArgs["assetType"];
-  name: InitializeAssetInstructionDataArgs["name"];
-  symbol: InitializeAssetInstructionDataArgs["symbol"];
-  uri: InitializeAssetInstructionDataArgs["uri"];
-  decimals: InitializeAssetInstructionDataArgs["decimals"];
+  amountTokens: MintAssetInstructionDataArgs["amountTokens"];
 };
 
-export function getInitializeAssetInstruction<
+export function getMintAssetInstruction<
   TAccountAssetRegistry extends string,
   TAccountMint extends string,
-  TAccountMetadata extends string,
   TAccountOwner extends string,
+  TAccountDestiny extends string,
+  TAccountDestinyAssetTokenAccount extends string,
   TAccountSystemProgram extends string,
   TAccountTokenProgram extends string,
-  TAccountTokenMetadataProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
   TAccountRent extends string,
   TProgramAddress extends Address = typeof ANCHOR_RWA_TEMPLATE_PROGRAM_ADDRESS,
 >(
-  input: InitializeAssetInput<
+  input: MintAssetInput<
     TAccountAssetRegistry,
     TAccountMint,
-    TAccountMetadata,
     TAccountOwner,
+    TAccountDestiny,
+    TAccountDestinyAssetTokenAccount,
     TAccountSystemProgram,
     TAccountTokenProgram,
-    TAccountTokenMetadataProgram,
+    TAccountAssociatedTokenProgram,
     TAccountRent
   >,
   config?: { programAddress?: TProgramAddress },
-): InitializeAssetInstruction<
+): MintAssetInstruction<
   TProgramAddress,
   TAccountAssetRegistry,
   TAccountMint,
-  TAccountMetadata,
   TAccountOwner,
+  TAccountDestiny,
+  TAccountDestinyAssetTokenAccount,
   TAccountSystemProgram,
   TAccountTokenProgram,
-  TAccountTokenMetadataProgram,
+  TAccountAssociatedTokenProgram,
   TAccountRent
 > {
   // Program address.
@@ -412,12 +362,16 @@ export function getInitializeAssetInstruction<
   const originalAccounts = {
     assetRegistry: { value: input.assetRegistry ?? null, isWritable: true },
     mint: { value: input.mint ?? null, isWritable: true },
-    metadata: { value: input.metadata ?? null, isWritable: true },
     owner: { value: input.owner ?? null, isWritable: true },
+    destiny: { value: input.destiny ?? null, isWritable: false },
+    destinyAssetTokenAccount: {
+      value: input.destinyAssetTokenAccount ?? null,
+      isWritable: true,
+    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-    tokenMetadataProgram: {
-      value: input.tokenMetadataProgram ?? null,
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
       isWritable: false,
     },
     rent: { value: input.rent ?? null, isWritable: false },
@@ -439,9 +393,9 @@ export function getInitializeAssetInstruction<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
-  if (!accounts.tokenMetadataProgram.value) {
-    accounts.tokenMetadataProgram.value =
-      "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" as Address<"metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s">;
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
   }
   if (!accounts.rent.value) {
     accounts.rent.value =
@@ -453,31 +407,33 @@ export function getInitializeAssetInstruction<
     accounts: [
       getAccountMeta(accounts.assetRegistry),
       getAccountMeta(accounts.mint),
-      getAccountMeta(accounts.metadata),
       getAccountMeta(accounts.owner),
+      getAccountMeta(accounts.destiny),
+      getAccountMeta(accounts.destinyAssetTokenAccount),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.tokenProgram),
-      getAccountMeta(accounts.tokenMetadataProgram),
+      getAccountMeta(accounts.associatedTokenProgram),
       getAccountMeta(accounts.rent),
     ],
-    data: getInitializeAssetInstructionDataEncoder().encode(
-      args as InitializeAssetInstructionDataArgs,
+    data: getMintAssetInstructionDataEncoder().encode(
+      args as MintAssetInstructionDataArgs,
     ),
     programAddress,
-  } as InitializeAssetInstruction<
+  } as MintAssetInstruction<
     TProgramAddress,
     TAccountAssetRegistry,
     TAccountMint,
-    TAccountMetadata,
     TAccountOwner,
+    TAccountDestiny,
+    TAccountDestinyAssetTokenAccount,
     TAccountSystemProgram,
     TAccountTokenProgram,
-    TAccountTokenMetadataProgram,
+    TAccountAssociatedTokenProgram,
     TAccountRent
   >);
 }
 
-export type ParsedInitializeAssetInstruction<
+export type ParsedMintAssetInstruction<
   TProgram extends string = typeof ANCHOR_RWA_TEMPLATE_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
@@ -485,25 +441,27 @@ export type ParsedInitializeAssetInstruction<
   accounts: {
     assetRegistry: TAccountMetas[0];
     mint: TAccountMetas[1];
-    metadata: TAccountMetas[2];
-    owner: TAccountMetas[3];
-    systemProgram: TAccountMetas[4];
-    tokenProgram: TAccountMetas[5];
-    tokenMetadataProgram: TAccountMetas[6];
-    rent: TAccountMetas[7];
+    owner: TAccountMetas[2];
+    /** CHECK */
+    destiny: TAccountMetas[3];
+    destinyAssetTokenAccount: TAccountMetas[4];
+    systemProgram: TAccountMetas[5];
+    tokenProgram: TAccountMetas[6];
+    associatedTokenProgram: TAccountMetas[7];
+    rent: TAccountMetas[8];
   };
-  data: InitializeAssetInstructionData;
+  data: MintAssetInstructionData;
 };
 
-export function parseInitializeAssetInstruction<
+export function parseMintAssetInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedInitializeAssetInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
+): ParsedMintAssetInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 9) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -518,13 +476,14 @@ export function parseInitializeAssetInstruction<
     accounts: {
       assetRegistry: getNextAccount(),
       mint: getNextAccount(),
-      metadata: getNextAccount(),
       owner: getNextAccount(),
+      destiny: getNextAccount(),
+      destinyAssetTokenAccount: getNextAccount(),
       systemProgram: getNextAccount(),
       tokenProgram: getNextAccount(),
-      tokenMetadataProgram: getNextAccount(),
+      associatedTokenProgram: getNextAccount(),
       rent: getNextAccount(),
     },
-    data: getInitializeAssetInstructionDataDecoder().decode(instruction.data),
+    data: getMintAssetInstructionDataDecoder().decode(instruction.data),
   };
 }

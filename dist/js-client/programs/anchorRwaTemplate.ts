@@ -16,6 +16,7 @@ import {
 import {
   type ParsedInitializeAssetInstruction,
   type ParsedInitializeInstruction,
+  type ParsedMintAssetInstruction,
 } from "../instructions";
 
 export const ANCHOR_RWA_TEMPLATE_PROGRAM_ADDRESS =
@@ -48,6 +49,7 @@ export function identifyAnchorRwaTemplateAccount(
 export enum AnchorRwaTemplateInstruction {
   Initialize,
   InitializeAsset,
+  MintAsset,
 }
 
 export function identifyAnchorRwaTemplateInstruction(
@@ -76,6 +78,17 @@ export function identifyAnchorRwaTemplateInstruction(
   ) {
     return AnchorRwaTemplateInstruction.InitializeAsset;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([84, 175, 211, 156, 56, 250, 104, 118]),
+      ),
+      0,
+    )
+  ) {
+    return AnchorRwaTemplateInstruction.MintAsset;
+  }
   throw new Error(
     "The provided instruction could not be identified as a anchorRwaTemplate instruction.",
   );
@@ -89,4 +102,7 @@ export type ParsedAnchorRwaTemplateInstruction<
     } & ParsedInitializeInstruction<TProgram>)
   | ({
       instructionType: AnchorRwaTemplateInstruction.InitializeAsset;
-    } & ParsedInitializeAssetInstruction<TProgram>);
+    } & ParsedInitializeAssetInstruction<TProgram>)
+  | ({
+      instructionType: AnchorRwaTemplateInstruction.MintAsset;
+    } & ParsedMintAssetInstruction<TProgram>);

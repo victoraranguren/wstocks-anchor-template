@@ -11,12 +11,6 @@ describe("anchor-rwa-template", () => {
   const program = anchor.workspace
     .AnchorRwaTemplate as Program<AnchorRwaTemplate>;
   const wallet = anchor.getProvider().wallet;
-  it("Is initialized!", async () => {
-    // Add your test here.
-    const tx = await program.methods.initialize().rpc();
-    console.log("Your transaction signature", tx);
-  });
-
   it("Is AssetRegistry initialized!", async () => {
     const uniqueId = new BN(Date.now());
     const uniqueIdBuffer = uniqueId.toArrayLike(Buffer, "le", 8);
@@ -52,6 +46,7 @@ describe("anchor-rwa-template", () => {
       uri: "",
       decimals: 8,
     };
+
     const [metadataAddress] = anchor.web3.PublicKey.findProgramAddressSync(
       [
         Buffer.from(METADATA_SEED),
@@ -69,7 +64,7 @@ describe("anchor-rwa-template", () => {
     console.log("metadata: ", metadataAddress);
     console.log("wallet: ", wallet.publicKey);
     console.log("ata: ", ata);
-    // Add your test here.
+
     const tx = await program.methods
       .initializeAsset(
         uniqueId,
@@ -84,9 +79,10 @@ describe("anchor-rwa-template", () => {
         mint: mint,
         metadata: metadataAddress,
         assetRegistry: assetRegistryPda,
-        ownerAssetTokenAccount: ata,
+        //ownerAssetTokenAccount: ata,
       })
       .rpc();
+
     console.log("Your transaction signature", tx);
 
     const assetRegistryAccount = await program.account.assetRegistry.fetch(
@@ -96,5 +92,73 @@ describe("anchor-rwa-template", () => {
 
     const assetRegistryAccountAll = await program.account.assetRegistry.all();
     console.log("assetRegistry All: ", assetRegistryAccountAll);
+
+    // console.log("------------|Minting tokens...|----------");
+
+    // const amountTokens = new BN(100);
+    // const txMint = await program.methods
+    //   .mintAsset(a
+    //     amountTokens
+    //   )
+    //   .accounts({
+    //     owner: wallet.publicKey,
+    //     mint: mint,
+    //     assetRegistry: assetRegistryPda,
+    //     ownerAssetTokenAccount: ata,
+    //   })
+    //   .rpc();
+
+    // console.log("Your mint transaction signature", txMint);
+
+  });
+
+  it("Increase supply", async () => {
+
+    const assetRegistryPda = new anchor.web3.PublicKey("DecpT7nJ9aqHSMctqd3HZZjHmXeLHPyxFrvZfTL5TddW")
+    const assetRegistryAccount = await program.account.assetRegistry.fetch(
+      assetRegistryPda
+    );
+    let [mint] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("mint"), new BN(assetRegistryAccount.id).toArrayLike(Buffer, "le", 8)],
+      program.programId
+    );
+    const destiny = new anchor.web3.PublicKey("HBSccEPTA7L1kjqxr1HF1J3pTq8Zi2k6Wdy8ZYvSPdQH");
+    const ata = await getAssociatedTokenAddress(mint, destiny);
+
+    console.log("assetRegistryPda: ", assetRegistryPda);
+    console.log("mint: ", mint);
+    console.log("wallet: ", wallet.publicKey);
+    console.log("destiny: ", destiny);
+    console.log("ata: ", ata);
+
+    console.log("assetRegistry: ", assetRegistryAccount);
+
+    const assetRegistryAccountAll = await program.account.assetRegistry.all();
+    console.log("assetRegistry All: ", assetRegistryAccountAll);
+
+    console.log("------------|Minting tokens...|----------");
+
+    const amountTokens = new BN(200);
+    const txMint = await program.methods
+      .mintAsset(
+        amountTokens
+      )
+      .accounts({
+        owner: wallet.publicKey,
+        mint: mint,
+        assetRegistry: assetRegistryPda,
+        destiny: destiny,
+        //destinyAssetTokenAccount: ata,
+      })
+      .rpc();
+
+    console.log("Your mint transaction signature", txMint);
+
+    [mint] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("mint"), new BN(assetRegistryAccount.id).toArrayLike(Buffer, "le", 8)],
+      program.programId
+    );
+
+    console.log("Mint: ", mint);
   });
 });

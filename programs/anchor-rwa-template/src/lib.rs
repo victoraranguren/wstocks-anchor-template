@@ -28,7 +28,7 @@ pub mod anchor_rwa_template {
         asset_type: AssetType,
         metadata: InitTokenParams,
     ) -> Result<()> {
-        //1. Creaye registry
+        //1. Create registry
         let asset_registry = &mut ctx.accounts.asset_registry;
         let timestamp = Clock::get()?.unix_timestamp;
 
@@ -78,19 +78,32 @@ pub mod anchor_rwa_template {
         create_metadata_accounts_v3(metadata_ctx, token_data, false, true, None)?;
 
         msg!("Token mint created successfully.");
+        Ok(())
+    }
 
-        //3. Mint tokens to the owner's wallet
+    pub fn mint_asset(
+        ctx: Context<MintAsset>,
+        amount_tokens: u64, 
+    ) -> Result<()> {
+        require!(amount_tokens > 0, MyError::AmountTooSmall);
+
+        let total_tokens = amount_tokens * 10u64.pow(ctx.accounts.mint.decimals as u32);
+        let id_bytes = ctx.accounts.asset_registry.id.to_le_bytes();
+        let seeds = &["mint".as_bytes(), id_bytes.as_ref(), &[ctx.bumps.mint]];
+        let signer = [&seeds[..]];
+
+        //1. Mint tokens to the owner's wallet
         let mint_tokens_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             MintTo {
                 mint: ctx.accounts.mint.to_account_info(),
-                to: ctx.accounts.owner_asset_token_account.to_account_info(),
+                to: ctx.accounts.destiny_asset_token_account.to_account_info(),
                 authority: ctx.accounts.owner.to_account_info(),
             },
             &signer,
         );
 
-        mint_to(mint_tokens_ctx, 100_000_000_000_000)?;
+        mint_to(mint_tokens_ctx, total_tokens)?;
 
         msg!("Tokens minted successfully.");
         Ok(())
@@ -121,16 +134,43 @@ pub struct InitializeAsset<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    #[account(init_if_needed, 
-        payer = owner,
-        associated_token::mint = mint,
-        associated_token::authority = owner
-    )]
-    pub owner_asset_token_account: Account<'info, TokenAccount>,
-
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub token_metadata_program: Program<'info, Metaplex>,
+
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct MintAsset<'info> {
+    #[account(
+        mut,
+        seeds = [b"asset_registry", owner.key().as_ref(), asset_registry.id.to_le_bytes().as_ref()],
+        bump = asset_registry.bump
+    )]
+    pub asset_registry: Account<'info, AssetRegistry>,
+    #[account(
+        mut,
+        seeds = [b"mint", asset_registry.id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub mint: Account<'info, Mint>,
+
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    /// CHECK
+    pub destiny: SystemAccount<'info>,
+    #[account(
+        init_if_needed, 
+        payer = owner,
+        associated_token::mint = mint,
+        associated_token::authority = destiny
+    )]
+    pub destiny_asset_token_account: Account<'info, TokenAccount>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
 
     pub rent: Sysvar<'info, Rent>,
@@ -171,4 +211,10 @@ pub struct InitTokenParams {
     pub symbol: String,
     pub uri: String,
     pub decimals: u8,
+}
+
+#[error_code]
+pub enum MyError {
+    #[msg("El monto debe ser mayor a cero.")]
+    AmountTooSmall,
 }
