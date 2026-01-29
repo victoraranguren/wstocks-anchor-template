@@ -191,7 +191,7 @@ pub struct CloseAsset<'info> {
     )]
     pub asset_registry: Account<'info, AssetRegistry>,
 
-    #[account(mut)]
+    #[account(mut, constraint = owner.key() == asset_registry.authority)]
     pub owner: Signer<'info>,
 }
 
