@@ -14,6 +14,7 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
+  type ParsedCloseAssetInstruction,
   type ParsedInitializeAssetInstruction,
   type ParsedInitializeInstruction,
   type ParsedMintAssetInstruction,
@@ -47,6 +48,7 @@ export function identifyAnchorRwaTemplateAccount(
 }
 
 export enum AnchorRwaTemplateInstruction {
+  CloseAsset,
   Initialize,
   InitializeAsset,
   MintAsset,
@@ -56,6 +58,17 @@ export function identifyAnchorRwaTemplateInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): AnchorRwaTemplateInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([39, 124, 90, 146, 16, 82, 77, 253]),
+      ),
+      0,
+    )
+  ) {
+    return AnchorRwaTemplateInstruction.CloseAsset;
+  }
   if (
     containsBytes(
       data,
@@ -97,6 +110,9 @@ export function identifyAnchorRwaTemplateInstruction(
 export type ParsedAnchorRwaTemplateInstruction<
   TProgram extends string = "jEXgKE9NWJihHqLVAoXZ4e2TSZ7KkV7kub8j4ojcmZC",
 > =
+  | ({
+      instructionType: AnchorRwaTemplateInstruction.CloseAsset;
+    } & ParsedCloseAssetInstruction<TProgram>)
   | ({
       instructionType: AnchorRwaTemplateInstruction.Initialize;
     } & ParsedInitializeInstruction<TProgram>)

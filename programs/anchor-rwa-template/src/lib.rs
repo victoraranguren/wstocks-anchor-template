@@ -22,6 +22,7 @@ pub mod anchor_rwa_template {
     pub fn initialize_asset(
         ctx: Context<InitializeAsset>,
         id: u64,
+        asset_name: String,
         asset_symbol: String,
         asset_isin: String,
         legal_doc_uri: String,
@@ -37,6 +38,7 @@ pub mod anchor_rwa_template {
         asset_registry.authority = ctx.accounts.owner.key();
         asset_registry.mint = ctx.accounts.mint.key();
 
+        asset_registry.asset_name = asset_name;
         asset_registry.asset_symbol = asset_symbol;
         asset_registry.asset_isin = asset_isin;
         asset_registry.legal_doc_uri = legal_doc_uri;
@@ -81,10 +83,7 @@ pub mod anchor_rwa_template {
         Ok(())
     }
 
-    pub fn mint_asset(
-        ctx: Context<MintAsset>,
-        amount_tokens: u64, 
-    ) -> Result<()> {
+    pub fn mint_asset(ctx: Context<MintAsset>, amount_tokens: u64) -> Result<()> {
         require!(amount_tokens > 0, MyError::AmountTooSmall);
 
         let total_tokens = amount_tokens * 10u64.pow(ctx.accounts.mint.decimals as u32);
@@ -106,6 +105,14 @@ pub mod anchor_rwa_template {
         mint_to(mint_tokens_ctx, total_tokens)?;
 
         msg!("Tokens minted successfully.");
+        Ok(())
+    }
+
+    pub fn close_asset(ctx: Context<CloseAsset>) -> Result<()> {
+        msg!(
+            "Asset Registry Account closed: {:?}",
+            ctx.accounts.asset_registry.key()
+        );
         Ok(())
     }
 }
@@ -162,7 +169,7 @@ pub struct MintAsset<'info> {
     /// CHECK
     pub destiny: SystemAccount<'info>,
     #[account(
-        init_if_needed, 
+        init_if_needed,
         payer = owner,
         associated_token::mint = mint,
         associated_token::authority = destiny
@@ -176,6 +183,18 @@ pub struct MintAsset<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
+#[derive(Accounts)]
+pub struct CloseAsset<'info> {
+    #[account(
+        mut,
+        close = owner
+    )]
+    pub asset_registry: Account<'info, AssetRegistry>,
+
+    #[account(mut)]
+    pub owner: Signer<'info>,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct AssetRegistry {
@@ -184,8 +203,10 @@ pub struct AssetRegistry {
     pub authority: Pubkey,
     pub mint: Pubkey,
 
-    #[max_len(10)]
+    #[max_len(16)]
     pub asset_symbol: String,
+    #[max_len(50)]
+    pub asset_name: String,
     #[max_len(16)]
     pub asset_isin: String,
     #[max_len(200)]

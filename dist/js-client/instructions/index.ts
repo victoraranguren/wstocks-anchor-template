@@ -6,6 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./closeAsset";
 export * from "./initialize";
 export * from "./initializeAsset";
 export * from "./mintAsset";

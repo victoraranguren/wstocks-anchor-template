@@ -69,6 +69,7 @@ export type AssetRegistry = {
   authority: Address;
   mint: Address;
   assetSymbol: string;
+  assetName: string;
   assetIsin: string;
   legalDocUri: string;
   creationDate: bigint;
@@ -81,6 +82,7 @@ export type AssetRegistryArgs = {
   authority: Address;
   mint: Address;
   assetSymbol: string;
+  assetName: string;
   assetIsin: string;
   legalDocUri: string;
   creationDate: number | bigint;
@@ -97,6 +99,7 @@ export function getAssetRegistryEncoder(): Encoder<AssetRegistryArgs> {
       ["authority", getAddressEncoder()],
       ["mint", getAddressEncoder()],
       ["assetSymbol", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
+      ["assetName", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
       ["assetIsin", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
       ["legalDocUri", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
       ["creationDate", getI64Encoder()],
@@ -115,6 +118,7 @@ export function getAssetRegistryDecoder(): Decoder<AssetRegistry> {
     ["authority", getAddressDecoder()],
     ["mint", getAddressDecoder()],
     ["assetSymbol", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
+    ["assetName", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ["assetIsin", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ["legalDocUri", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ["creationDate", getI64Decoder()],

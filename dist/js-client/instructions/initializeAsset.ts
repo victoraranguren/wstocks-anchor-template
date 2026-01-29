@@ -117,6 +117,7 @@ export type InitializeAssetInstruction<
 export type InitializeAssetInstructionData = {
   discriminator: ReadonlyUint8Array;
   id: bigint;
+  assetName: string;
   assetSymbol: string;
   assetIsin: string;
   legalDocUri: string;
@@ -129,6 +130,7 @@ export type InitializeAssetInstructionData = {
 
 export type InitializeAssetInstructionDataArgs = {
   id: number | bigint;
+  assetName: string;
   assetSymbol: string;
   assetIsin: string;
   legalDocUri: string;
@@ -144,6 +146,7 @@ export function getInitializeAssetInstructionDataEncoder(): Encoder<InitializeAs
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["id", getU64Encoder()],
+      ["assetName", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
       ["assetSymbol", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
       ["assetIsin", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
       ["legalDocUri", addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder())],
@@ -161,6 +164,7 @@ export function getInitializeAssetInstructionDataDecoder(): Decoder<InitializeAs
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["id", getU64Decoder()],
+    ["assetName", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ["assetSymbol", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ["assetIsin", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
     ["legalDocUri", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
@@ -201,6 +205,7 @@ export type InitializeAssetAsyncInput<
   tokenMetadataProgram?: Address<TAccountTokenMetadataProgram>;
   rent?: Address<TAccountRent>;
   id: InitializeAssetInstructionDataArgs["id"];
+  assetName: InitializeAssetInstructionDataArgs["assetName"];
   assetSymbol: InitializeAssetInstructionDataArgs["assetSymbol"];
   assetIsin: InitializeAssetInstructionDataArgs["assetIsin"];
   legalDocUri: InitializeAssetInstructionDataArgs["legalDocUri"];
@@ -361,6 +366,7 @@ export type InitializeAssetInput<
   tokenMetadataProgram?: Address<TAccountTokenMetadataProgram>;
   rent?: Address<TAccountRent>;
   id: InitializeAssetInstructionDataArgs["id"];
+  assetName: InitializeAssetInstructionDataArgs["assetName"];
   assetSymbol: InitializeAssetInstructionDataArgs["assetSymbol"];
   assetIsin: InitializeAssetInstructionDataArgs["assetIsin"];
   legalDocUri: InitializeAssetInstructionDataArgs["legalDocUri"];
