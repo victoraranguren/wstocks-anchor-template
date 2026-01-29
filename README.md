@@ -1,204 +1,261 @@
 # wStocks – Anchor RWA Program
 
-Programa Anchor del ecosistema **wStocks** para registrar activos del mundo real (RWA) y emitir su token SPL asociado en Solana.
+**wStocks** ecosystem Anchor program designed to register Real World Assets (RWA) and issue their associated SPL token on Solana.
 
 ## Intro
 
-Este repositorio contiene el **Solana Program** (programa on-chain) principal de **wStocks**, que complementa al frontend `wStocks` (`wstocks-frontend-template`). Desde el punto de vista funcional, define el registro on-chain de activos y las operaciones para crear y mintear el token SPL asociado que luego consume el frontend.
+This repository contains the main **Solana Program** (on-chain program) for **wStocks**, which complements the `wStocks` frontend (`wstocks-frontend-template`). Functionally, it defines the on-chain asset registry and the operations required to create and mint the associated SPL token consumed by the frontend.
 
-- Repositorio GitHub (programa Anchor): https://github.com/victoraranguren/wstocks-anchor-template
-- Frontend wStocks (DApp): https://github.com/victoraranguren/wstocks-frontend-template
+* GitHub Repository (Anchor Program): [https://github.com/victoraranguren/wstocks-anchor-template](https://github.com/victoraranguren/wstocks-anchor-template)
+* wStocks Frontend (DApp): [https://github.com/victoraranguren/wstocks-frontend-template](https://github.com/victoraranguren/wstocks-frontend-template)
 
-La lógica principal es:
+The main logic is as follows:
 
-1. Crear un **registro on-chain** del activo (Asset Registry) con su información legal y de negocio.
-2. Derivar y crear el **mint SPL** asociado a ese activo.
-3. Permitir **mintear más supply** del token hacia cuentas destino autorizadas.
-4. Opcionalmente, **cerrar** el registro del activo.
+1. Create an **on-chain asset registry** containing its legal and business information.
+2. Derive and create the **SPL mint** associated with that asset.
+3. Allow **minting additional supply** of the token to authorized destination accounts.
+4. Optionally, **close** the asset registry.
 
-## Tech stack
+## Tech Stack
 
-- **Rust + Anchor** para el programa on-chain.
-- **anchor_spl** para integraciones con:
-  - SPL Token (mint, cuentas asociadas).
-  - Metaplex Token Metadata (metadata del mint).
-- **TypeScript** para tests y cliente JS generado.
-- **Codama** para generar el cliente TypeScript (`dist/js-client`).
+* **Rust + Anchor** for the on-chain program.
+* **anchor_spl** for integrations with:
+* SPL Token (mint, associated accounts).
+* Metaplex Token Metadata (mint metadata).
 
-## Requisitos previos
 
-- Rust y toolchain de Anchor instalados (ver `[toolchain]` y `[provider]` en `Anchor.toml`).
-- Solana CLI instalada y configurada con una keypair (`~/.config/solana/id.json`).
-- Node.js >= 18 y `yarn` / `pnpm` / `npm` para ejecutar scripts de tooling y pruebas.
+* **TypeScript** for tests and the generated JS client.
+* **Codama** to generate the TypeScript client (`dist/js-client`).
 
-## Instalación
+## Prerequisites
 
-1. Clona el repositorio del programa Anchor:
-   ```bash path=null start=null
-   git clone https://github.com/victoraranguren/wstocks-anchor-template.git
-   cd wstocks-anchor-template
-   ```
-2. Instala dependencias JS (para tests, Codama, etc.):
-   ```bash path=null start=null
-   pnpm install
-   # o
-   yarn install
-   # o
-   npm install
-   ```
+* Rust and Anchor toolchain installed (see `[toolchain]` and `[provider]` in `Anchor.toml`).
+* Solana CLI installed and configured with a keypair (`~/.config/solana/id.json`).
+* Node.js >= 18 and `yarn` / `pnpm` / `npm` to run tooling and test scripts.
 
-## Scripts habituales
+## Installation
 
-Desde la raíz del proyecto:
+1. Clone the Anchor program repository:
+```bash
+git clone https://github.com/victoraranguren/wstocks-anchor-template.git
+cd wstocks-anchor-template
 
-- **Lint** (Prettier sobre JS/TS):
-  ```bash path=null start=null
-  pnpm lint
-  ```
-- **Lint + autofix**:
-  ```bash path=null start=null
-  pnpm lint:fix
-  ```
-- **Tests Anchor (ts-mocha)**, usando el script definido en `Anchor.toml`:
-  ```bash path=null start=null
-  anchor test
-  ```
+```
 
-Asegúrate de tener el `cluster` configurado (por defecto `Localnet` en `Anchor.toml`).
 
-## Arquitectura del código
+2. Install JS dependencies (for tests, Codama, etc.):
+```bash
+pnpm install
+# or
+yarn install
+# or
+npm install
 
-La solución se divide en tres piezas principales:
+```
 
-- **Programa Anchor (on-chain)**
-- **Cliente TypeScript generado (Codama)**
-- **Tests de integración Anchor (ts-mocha)**
 
-### Programa Anchor (`programs/anchor-rwa-template/src/lib.rs`)
 
-El módulo `anchor_rwa_template` define las instrucciones y cuentas principales:
+## Common Scripts
 
-- **Instrucciones**
-  - `initialize`:
-    - Simple instrucción de saludo/bootstrapping, útil para verificar despliegues.
-  - `initialize_asset`:
-    - Crea y rellena la cuenta `AssetRegistry` (registro on-chain del activo).
-    - Deriva y crea el **mint SPL** asociado usando una PDA con seed `"mint"` + `id`.
-    - Crea la cuenta de **metadata de Metaplex** (`Metadata`) usando `create_metadata_accounts_v3`.
-  - `mint_asset`:
-    - Mintea una cantidad adicional de tokens SPL hacia una cuenta de destino asociada (ATA).
-    - Valida que `amount_tokens > 0` y convierte la cantidad a base 10 en función de los `decimals` del mint.
-  - `close_asset`:
-    - Cierra la cuenta del registro (`AssetRegistry`) y envía el lamports restante al `owner`.
+From the project root:
 
-- **Cuentas**
-  - `AssetRegistry`:
-    - Cuenta de datos que representa un activo on-chain.
-    - Campos principales:
-      - `id: u64` — identificador único del asset.
-      - `authority: Pubkey` — autoridad/proprietario del registro.
-      - `mint: Pubkey` — mint SPL asociado al activo.
-      - `asset_symbol: String` — símbolo corto (ej. `WTSLA`).
-      - `asset_name: String` — nombre legible del activo.
-      - `asset_isin: String` — identificador tipo ISIN / código interno.
-      - `legal_doc_uri: String` — enlace al documento legal del activo.
-      - `creation_date: i64` — timestamp Unix de creación.
-      - `asset_type: AssetType` — tipo de activo (equity, debt, etc.).
-      - `bump: u8` — bump de la PDA.
-  - `AssetType` (enum):
-    - `Equity`
-    - `Debt`
-    - `RealEstate`
-    - `Commodity`
-  - `InitTokenParams` (struct):
-    - `name: String` — nombre del token SPL.
-    - `symbol: String` — símbolo del token SPL.
-    - `uri: String` — URI de metadata (JSON on-chain/off-chain).
-    - `decimals: u8` — decimales del mint.
+* **Lint** (Prettier on JS/TS):
+```bash
+pnpm lint
 
-- **Lógica de negocio principal**
+```
 
-  **1. Registro del activo (`initialize_asset`)**
 
-  - Se crea una cuenta `AssetRegistry` con seeds:
-    - `b"asset_registry"`, `owner.key()`, `id.to_le_bytes()`.
-  - Se rellena con los datos de negocio y legales del activo.
-  - A partir de `id` se derivan seeds para el mint SPL:
-    - `b"mint"`, `id.to_le_bytes()`.
-  - Se crea el mint SPL con:
-    - `mint::decimals = 8` (en el código actual).
-    - `mint::authority = owner` y `mint::freeze_authority = owner`.
-  - Se construye la metadata de Metaplex (`DataV2`) con los campos de `InitTokenParams` y se invoca `create_metadata_accounts_v3` vía CPI.
+* **Lint + autofix**:
+```bash
+pnpm lint:fix
 
-  Resultado: tras esta instrucción tienes **un asset registrado on-chain** + **un mint SPL con su metadata** listo para ser usado por el frontend.
+```
 
-  **2. Mint de tokens (`mint_asset`)**
 
-  - A partir de `asset_registry.id` se recalculan las seeds del mint SPL (`b"mint" + id`).
-  - Se deriva/crea si hace falta la cuenta asociada (ATA) de destino (`destiny_asset_token_account`) usando `AssociatedToken`.
-  - Se calcula el total de tokens a mintear:
-    - `total_tokens = amount_tokens * 10^decimals`.
-  - Se ejecuta un CPI a `token::mint_to` firmando con las seeds del mint PDA.
+* **Anchor Tests (ts-mocha)**, using the script defined in `Anchor.toml`:
+```bash
+anchor test
 
-  Resultado: se incrementa el **supply circulante** del token SPL asociado al asset y se asigna a la cuenta destino indicada.
+```
 
-  **3. Cierre del asset (`close_asset`)**
 
-  - `close_asset` marca la cuenta `AssetRegistry` para ser cerrada, enviando los lamports remanentes al `owner`.
-  - Es útil para limpiar registros que ya no se usarán.
 
-### Cliente TypeScript (`dist/js-client`)
+Ensure you have the `cluster` configured (defaults to `Localnet` in `Anchor.toml`).
 
-El cliente TypeScript es generado automáticamente con **Codama** y expone helpers tipados para integrarse fácilmente desde el frontend o scripts Node:
+## Code Architecture
 
-- `dist/js-client/accounts/assetRegistry.ts`:
-  - Tipos y codecs para decodificar/encodificar la cuenta `AssetRegistry`.
-  - Helpers como `fetchAssetRegistry`, `fetchAllAssetRegistry`, etc.
-- `dist/js-client/instructions/initializeAsset.ts`:
-  - Tipos `InitializeAssetInstruction*`.
-  - Encoders/decoders de datos de la instrucción.
-  - Funciones `getInitializeAssetInstruction` y `getInitializeAssetInstructionAsync` para construir instrucciones listas para usarse con `@solana/kit`.
-- `dist/js-client/instructions/mintAsset.ts`:
-  - Tipos y helpers análogos para la instrucción de mint.
-- `dist/js-client/types/assetType.ts`:
-  - Enum `AssetType` y codecs asociados.
+The solution is divided into three main components:
 
-Este cliente es el que consume el frontend `wStocks` (`wstocks-frontend-template`) para leer registros y disparar transacciones.
+* **Anchor Program (on-chain)**
+* **Generated TypeScript Client (Codama)**
+* **Anchor Integration Tests (ts-mocha)**
+
+### Anchor Program (`programs/anchor-rwa-template/src/lib.rs`)
+
+The `anchor_rwa_template` module defines the main instructions and accounts:
+
+* **Instructions**
+* `initialize`:
+* Simple greeting/bootstrapping instruction, useful for verifying deployments.
+
+
+* `initialize_asset`:
+* Creates and populates the `AssetRegistry` account (on-chain asset registry).
+* Derives and creates the associated **SPL mint** using a PDA with seed `"mint"` + `id`.
+* Creates the **Metaplex metadata** account (`Metadata`) using `create_metadata_accounts_v3`.
+
+
+* `mint_asset`:
+* Mints an additional amount of SPL tokens to an associated destination account (ATA).
+* Validates that `amount_tokens > 0` and converts the amount to base 10 based on the mint's `decimals`.
+
+
+* `close_asset`:
+* Closes the registry account (`AssetRegistry`) and sends the remaining lamports to the `owner`.
+
+
+
+
+* **Accounts**
+* `AssetRegistry`:
+* Data account representing an on-chain asset.
+* Main fields:
+* `id: u64` — unique asset identifier.
+* `authority: Pubkey` — authority/owner of the registry.
+* `mint: Pubkey` — SPL mint associated with the asset.
+* `asset_symbol: String` — short symbol (e.g., `WTSLA`).
+* `asset_name: String` — readable name of the asset.
+* `asset_isin: String` — ISIN identifier / internal code.
+* `legal_doc_uri: String` — link to the asset's legal document.
+* `creation_date: i64` — Unix timestamp of creation.
+* `asset_type: AssetType` — asset type (equity, debt, etc.).
+* `bump: u8` — PDA bump.
+
+
+
+
+* `AssetType` (enum):
+* `Equity`
+* `Debt`
+* `RealEstate`
+* `Commodity`
+
+
+* `InitTokenParams` (struct):
+* `name: String` — SPL token name.
+* `symbol: String` — SPL token symbol.
+* `uri: String` — metadata URI (on-chain/off-chain JSON).
+* `decimals: u8` — mint decimals.
+
+
+
+
+* **Main Business Logic**
+**1. Asset Registration (`initialize_asset`)**
+* An `AssetRegistry` account is created with seeds:
+* `b"asset_registry"`, `owner.key()`, `id.to_le_bytes()`.
+
+
+* Populated with business and legal asset data.
+* Seeds for the SPL mint are derived from `id`:
+* `b"mint"`, `id.to_le_bytes()`.
+
+
+* The SPL mint is created with:
+* `mint::decimals = 8` (in current code).
+* `mint::authority = owner` and `mint::freeze_authority = owner`.
+
+
+* Metaplex metadata (`DataV2`) is constructed with `InitTokenParams` fields and `create_metadata_accounts_v3` is invoked via CPI.
+
+
+Result: After this instruction, you have **an on-chain registered asset** + **an SPL mint with its metadata** ready to be used by the frontend.
+**2. Token Minting (`mint_asset`)**
+* SPL mint seeds are recalculated from `asset_registry.id` (`b"mint" + id`).
+* The destination associated account (ATA) (`destiny_asset_token_account`) is derived/created if needed using `AssociatedToken`.
+* The total tokens to mint is calculated:
+* `total_tokens = amount_tokens * 10^decimals`.
+
+
+* A CPI to `token::mint_to` is executed, signing with the mint PDA seeds.
+
+
+Result: The **circulating supply** of the SPL token associated with the asset is increased and assigned to the indicated destination account.
+**3. Closing the Asset (`close_asset`)**
+* `close_asset` marks the `AssetRegistry` account to be closed, sending remaining lamports to the `owner`.
+* Useful for cleaning up registries that will no longer be used.
+
+
+
+### TypeScript Client (`dist/js-client`)
+
+The TypeScript client is automatically generated with **Codama** and exposes typed helpers to easily integrate from the frontend or Node scripts:
+
+* `dist/js-client/accounts/assetRegistry.ts`:
+* Types and codecs to decode/encode the `AssetRegistry` account.
+* Helpers like `fetchAssetRegistry`, `fetchAllAssetRegistry`, etc.
+
+
+* `dist/js-client/instructions/initializeAsset.ts`:
+* `InitializeAssetInstruction*` types.
+* Encoders/decoders for instruction data.
+* Functions `getInitializeAssetInstruction` and `getInitializeAssetInstructionAsync` to build instructions ready to be used with `@solana/kit`.
+
+
+* `dist/js-client/instructions/mintAsset.ts`:
+* Analogous types and helpers for the mint instruction.
+
+
+* `dist/js-client/types/assetType.ts`:
+* `AssetType` enum and associated codecs.
+
+
+
+This client is consumed by the `wStocks` frontend (`wstocks-frontend-template`) to read registries and trigger transactions.
 
 ### Tests (`tests/anchor-rwa-template.ts`)
 
-Los tests están escritos en TypeScript usando **Anchor + ts-mocha**:
+Tests are written in TypeScript using **Anchor + ts-mocha**:
 
-- Configuran el provider con `AnchorProvider.env()` y usan el workspace `AnchorRwaTemplate`.
-- Incluyen ejemplos (algunos comentados) de:
-  - Inicializar un asset (`initialize_asset`), imprimir PDAs y cuentas.
-  - Consultar `program.account.assetRegistry.fetch` y `.all()`.
-  - Mintear tokens adicionales a una cuenta de destino (`mint_asset`).
-  - (Comentado) Cerrar una cuenta de asset (`close_asset`).
+* They configure the provider with `AnchorProvider.env()` and use the `AnchorRwaTemplate` workspace.
+* Include examples (some commented out) of:
+* Initializing an asset (`initialize_asset`), printing PDAs and accounts.
+* Querying `program.account.assetRegistry.fetch` and `.all()`.
+* Minting additional tokens to a destination account (`mint_asset`).
+* (Commented out) Closing an asset account (`close_asset`).
 
-Sirven como referencia práctica de cómo interactuar con el programa desde un entorno de pruebas.
 
-## Flujo de negocio end-to-end
 
-1. **Frontend** llama a `initialize_asset` usando el cliente JS:
-   - El usuario rellena datos del activo (nombre, símbolo, ISIN, legalDocUri, tipo) y del token SPL (nombre, símbolo, uri, decimales).
-   - Se envía una transacción firmada por el `owner`.
-2. **Programa Anchor**:
-   - Crea `AssetRegistry` + mint SPL + metadata de Metaplex.
-3. **Frontend** lee los registros (`AssetRegistry`) y los muestra (tabla/cards).
-4. Cuando se requiere más supply:
-   - El frontend dispara `mint_asset` apuntando a una `destiny` pública.
-   - El programa mintea tokens hacia la ATA de esa `destiny`.
+These serve as a practical reference on how to interact with the program from a test environment.
 
-Con este flujo se modela el ciclo de vida completo de un RWA tokenizado: creación del registro legal/on-chain, creación del mint y emisión de tokens.
+## End-to-End Business Flow
 
-## Contribuir
+1. **Frontend** calls `initialize_asset` using the JS client:
+* The user fills in asset data (name, symbol, ISIN, legalDocUri, type) and SPL token data (name, symbol, uri, decimals).
+* A transaction signed by the `owner` is sent.
 
-1. Crea una rama desde `main` (o la rama de desarrollo que estés usando).
-2. Implementa tus cambios en el programa Anchor, cliente generado o tests.
-3. Ejecuta `anchor test` y `pnpm lint` antes de abrir el PR.
-4. Abre un Pull Request describiendo claramente el cambio funcional y cualquier migración de datos necesaria.
 
-## Licencia
+2. **Anchor Program**:
+* Creates `AssetRegistry` + SPL mint + Metaplex metadata.
 
-Pendiente de definir o actualizar según las necesidades del proyecto.
+
+3. **Frontend** reads the registries (`AssetRegistry`) and displays them (table/cards).
+4. When more supply is required:
+* The frontend triggers `mint_asset` pointing to a public `destiny`.
+* The program mints tokens to that `destiny`'s ATA.
+
+
+
+This flow models the full lifecycle of a tokenized RWA: legal/on-chain registry creation, mint creation, and token issuance.
+
+## Contributing
+
+1. Create a branch from `main` (or the development branch you are using).
+2. Implement your changes in the Anchor program, generated client, or tests.
+3. Run `anchor test` and `pnpm lint` before opening the PR.
+4. Open a Pull Request describing clearly the functional change and any necessary data migration.
+
+## License
+
+Pending definition or update according to project needs.
